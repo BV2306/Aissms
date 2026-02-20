@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "50447523338",
+    "project_id": "aissms-transport",
+    "storage_bucket": "aissms-transport.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:50447523338:android:139fab2497032ae1cf09f3",
+        "android_client_info": {
+          "package_name": "com.example.lastmile_transport"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3EIp2ST90BeyCZsM3z_IQX6bCgLNq61c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:50447523338:android:3c0a8e844738ecf7cf09f3",
+        "android_client_info": {
+          "package_name": "com.example.manymore"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3EIp2ST90BeyCZsM3z_IQX6bCgLNq61c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
