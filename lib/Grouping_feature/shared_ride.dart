@@ -2,40 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import './real_time_sharing.dart';
 
-
 class SharedRideSelectionPage extends StatefulWidget {
   const SharedRideSelectionPage({super.key});
-
 
   @override
   State<SharedRideSelectionPage> createState() =>
       _SharedRideSelectionPageState();
 }
 
-
 class _SharedRideSelectionPageState
     extends State<SharedRideSelectionPage> {
 
-
   final FirebaseFirestore firestore =
       FirebaseFirestore.instance;
-
 
   final TextEditingController pickupController =
       TextEditingController();
   final TextEditingController dropController =
       TextEditingController();
 
-
   String activeField = "pickup";
   String priorityGender = "No Preference";
-
 
   double? pickupLat;
   double? pickupLong;
   double? dropLat;
   double? dropLong;
 
+  String? dropLocationId;
 
   @override
   Widget build(BuildContext context) {
@@ -47,13 +41,10 @@ class _SharedRideSelectionPageState
       body: Column(
         children: [
 
-
-          // 🔹 Top Input Section
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
-
 
                 TextField(
                   controller: pickupController,
@@ -70,9 +61,7 @@ class _SharedRideSelectionPageState
                   },
                 ),
 
-
                 const SizedBox(height: 10),
-
 
                 TextField(
                   controller: dropController,
@@ -89,9 +78,7 @@ class _SharedRideSelectionPageState
                   },
                 ),
 
-
                 const SizedBox(height: 12),
-
 
                 DropdownButtonFormField<String>(
                   value: priorityGender,
@@ -120,32 +107,24 @@ class _SharedRideSelectionPageState
             ),
           ),
 
-
           const Divider(),
 
-
-          // 🔹 Location Suggestions
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream:
-                  firestore.collection('Locations').snapshots(),
+              stream: firestore.collection('Locations').snapshots(),
               builder: (context, snapshot) {
-
 
                 if (!snapshot.hasData) {
                   return const Center(
                       child: CircularProgressIndicator());
                 }
 
-
                 final docs = snapshot.data!.docs;
-
 
                 String searchText =
                     activeField == "pickup"
                         ? pickupController.text.toLowerCase()
                         : dropController.text.toLowerCase();
-
 
                 final filteredDocs = docs.where((doc) {
                   final name =
@@ -153,14 +132,12 @@ class _SharedRideSelectionPageState
                   return name.contains(searchText);
                 }).toList();
 
-
                 return ListView.builder(
                   itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
                     final data =
                         filteredDocs[index].data()
                             as Map<String, dynamic>;
-
 
                     return ListTile(
                       leading:
@@ -178,6 +155,8 @@ class _SharedRideSelectionPageState
                               data['name'];
                           dropLat = data['lat'];
                           dropLong = data['long'];
+                          dropLocationId =
+                              filteredDocs[index].id;
                         }
                         setState(() {});
                       },
@@ -188,8 +167,6 @@ class _SharedRideSelectionPageState
             ),
           ),
 
-
-          // 🔹 Find Sharing Button
           Padding(
             padding: const EdgeInsets.all(12),
             child: ElevatedButton(
@@ -200,13 +177,25 @@ class _SharedRideSelectionPageState
               ),
               onPressed: () {
 
+                if (dropLocationId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                            Text("Please select destination")),
+                  );
+                  return;
+                }
 
-               
-              Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SimpleLocationPage()),
-            );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NearbyUsersPage(
+                      destinationId: dropLocationId!,
+                      priorityGender: priorityGender,
+                      
+                    ),
+                  ),
+                );
               },
               child: const Text(
                 "Find Sharing",
@@ -219,8 +208,3 @@ class _SharedRideSelectionPageState
     );
   }
 }
-
-
-
-
-

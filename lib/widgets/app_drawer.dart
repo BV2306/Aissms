@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lastmile_transport/app_drawers_screens/Group_feature_screen.dart';
+import 'package:lastmile_transport/app_drawers_screens/Paid_lift_feature.screen.dart';
 // import 'package:manymore/data/insert_locations.dart';
 // import 'package:manymore/data/insert_riders.dart';
 // import 'package:manymore/data/locations_list.dart';
@@ -98,7 +99,7 @@ class AppDrawer extends StatelessWidget {
           //     MaterialPageRoute(builder: (context) => const InsertRidersPage()),
           //   );
           // }),
-           _drawerItem(context, Icons.auto_awesome, "Rides  ", () {
+           _drawerItem(context, Icons.auto_awesome, " group and Ride  ", () {
              
               Navigator.pop(context);
             Navigator.push(
@@ -106,14 +107,14 @@ class AppDrawer extends StatelessWidget {
               MaterialPageRoute(builder: (context) => const RidesPage()),
             );
           }),
-          //   _drawerItem(context, Icons.auto_awesome, "login  ", () {
+            _drawerItem(context, Icons.pedal_bike, "Payed Lift  ", () {
              
-          //     Navigator.pop(context);
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(builder: (context) => const PhoneLoginScreen()),
-          //   );
-          // }),
+              Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+            );
+          }),
           const Spacer(),
           const Divider(),
 

@@ -2,6 +2,7 @@
     <!-- Location permissions required for Geolocator -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- If you need background location updates on Android 10+ add:
          android.permission.ACCESS_BACKGROUND_LOCATION
          Make sure to request it at runtime and follow Play Store policies. -->
@@ -26,6 +27,10 @@
                         <meta-data
                             android:name="io.flutter.embedding.android.NormalTheme"
                             android:resource="@style/NormalTheme"
+                            />
+                        <meta-data
+                            android:name="com.google.android.geo.API_KEY"
+                            android:value="AIzaSyCzzyDtUQMFsybFHN7AXe_0fCZvjrILnPE" 
                             />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
