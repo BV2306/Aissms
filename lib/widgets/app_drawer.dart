@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lastmile_transport/Grouping_feature/temp.dart';
+import 'package:lastmile_transport/Offline_Booking_hub/Offline_Booking_using_Qa.dart';
 import 'package:lastmile_transport/app_drawers_screens/Group_feature_screen.dart';
 import 'package:lastmile_transport/app_drawers_screens/Paid_lift_feature.screen.dart';
+import 'package:lastmile_transport/chatbot/chatbot_screen.dart';
 // import 'package:manymore/data/insert_locations.dart';
 // import 'package:manymore/data/insert_riders.dart';
 // import 'package:manymore/data/locations_list.dart';
@@ -79,20 +81,28 @@ class AppDrawer extends StatelessWidget {
           // _drawerItem(context, Icons.favorite, "Otp Verification", () {}),
 
 
-          // _drawerItem(context, Icons.bedtime, "smart Hub ", () {
-          //   Navigator.pop(context);
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(builder: (context) => const SmartHubScreen()),
-          //   );
-          // }),
-          // _drawerItem(context, Icons.vaccines, "signup", () {
-          //     Navigator.pop(context);
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(builder: (context) => const SignupPage()),
-          //   );
-          // }),
+          _drawerItem(context, Icons.bedtime, "Chatbot  ", () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ChatApp()),
+            );
+          }),
+         _drawerItem(
+  context,
+  Icons.ev_station,
+  "Offline Booking",
+  () {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const EvHubOfflineChatbotScreen(),
+      ),
+    );
+  },
+),
          
            _drawerItem(context, Icons.auto_awesome, " group and Ride  ", () {
              

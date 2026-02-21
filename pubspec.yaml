@@ -49,6 +49,9 @@ dependencies:
   latlong2: ^0.9.0
   http: 1.6.0
   flutter_polyline_points: ^2.0.0
+  shared_preferences: ^2.2.2
+  mobile_scanner: ^3.5.5
+  flutter_markdown: ^0.7.1
 
 
 dev_dependencies:
