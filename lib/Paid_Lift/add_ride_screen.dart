@@ -17,6 +17,9 @@ class AddRideScreen extends StatefulWidget {
 class _AddRideScreenState extends State<AddRideScreen> {
   final MapController _mapController = MapController();
 
+  final TextEditingController sourceController = TextEditingController();
+  final TextEditingController destinationController = TextEditingController();
+
   LatLng? sourceLatLng;
   LatLng? destinationLatLng;
 
@@ -25,7 +28,6 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
   static const String googleApiKey = "AIzaSyCzzyDtUQMFsybFHN7AXe_0fCZvjrILnPE";
 
-  // ================= GOOGLE SEARCH =================
   Future<List<Map<String, dynamic>>> findPlaces(String query) async {
     if (query.isEmpty) return [];
 
@@ -33,7 +35,8 @@ class _AddRideScreenState extends State<AddRideScreen> {
         'https://maps.googleapis.com/maps/api/place/textsearch/json';
 
     final url = Uri.parse(
-        '$baseUrl?query=${Uri.encodeComponent(query)}&key=$googleApiKey');
+      '$baseUrl?query=${Uri.encodeComponent(query)}&key=$googleApiKey',
+    );
 
     try {
       final response = await http.get(url);
@@ -59,7 +62,6 @@ class _AddRideScreenState extends State<AddRideScreen> {
     return [];
   }
 
-  // ================= CREATE RIDE =================
   Future<void> createRide() async {
     if (sourceLatLng == null || destinationLatLng == null) return;
 
@@ -79,7 +81,6 @@ class _AddRideScreenState extends State<AddRideScreen> {
     if (mounted) Navigator.pop(context);
   }
 
-  // ================= MARKERS =================
   List<Marker> buildMarkers() {
     List<Marker> markers = [];
 
@@ -89,8 +90,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
           point: sourceLatLng!,
           width: 50,
           height: 50,
-          child: const Icon(Icons.location_on,
-              color: Colors.green, size: 40),
+          child: const Icon(Icons.location_on, color: Colors.green, size: 40),
         ),
       );
     }
@@ -101,8 +101,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
           point: destinationLatLng!,
           width: 50,
           height: 50,
-          child:
-              const Icon(Icons.location_on, color: Colors.red, size: 40),
+          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
         ),
       );
     }
@@ -112,8 +111,7 @@ class _AddRideScreenState extends State<AddRideScreen> {
 
   @override
   Widget build(BuildContext context) {
-    LatLng initialCenter =
-        sourceLatLng ?? const LatLng(18.5204, 73.8567);
+    LatLng initialCenter = sourceLatLng ?? const LatLng(18.5204, 73.8567);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Create Ride")),
@@ -123,28 +121,9 @@ class _AddRideScreenState extends State<AddRideScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-
-                // ================= SOURCE =================
                 TypeAheadField<Map<String, dynamic>>(
+                  controller: sourceController,
                   suggestionsCallback: findPlaces,
-                  itemBuilder: (context, suggestion) {
-                    return ListTile(
-                      title: Text(suggestion['name']),
-                      subtitle: Text(suggestion['address']),
-                    );
-                  },
-                  onSelected: (suggestion) {
-                    setState(() {
-                      sourceName = suggestion['name'];
-                      sourceLatLng =
-                          LatLng(suggestion['lat'], suggestion['lng']);
-                      _mapController.move(sourceLatLng!, 14);
-                    });
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Source selected: $sourceName")),
-                    );
-                  },
                   builder: (context, controller, focusNode) {
                     return TextField(
                       controller: controller,
@@ -156,13 +135,6 @@ class _AddRideScreenState extends State<AddRideScreen> {
                       ),
                     );
                   },
-                ),
-
-                const SizedBox(height: 16),
-
-                // ================= DESTINATION =================
-                TypeAheadField<Map<String, dynamic>>(
-                  suggestionsCallback: findPlaces,
                   itemBuilder: (context, suggestion) {
                     return ListTile(
                       title: Text(suggestion['name']),
@@ -171,18 +143,26 @@ class _AddRideScreenState extends State<AddRideScreen> {
                   },
                   onSelected: (suggestion) {
                     setState(() {
-                      destinationName = suggestion['name'];
-                      destinationLatLng =
-                          LatLng(suggestion['lat'], suggestion['lng']);
-                      _mapController.move(destinationLatLng!, 14);
+                      sourceName = suggestion['name'];
+                      sourceLatLng = LatLng(
+                        suggestion['lat'],
+                        suggestion['lng'],
+                      );
+                      sourceController.text = suggestion['name'];
+                      _mapController.move(sourceLatLng!, 14);
                     });
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content:
-                              Text("Destination selected: $destinationName")),
-                    );
+                    print(
+                      "SOURCE PLACE ID: ${suggestion['placeId']}",
+                    ); // ✅ PRINT HERE
                   },
+                ),
+
+                const SizedBox(height: 16),
+
+                TypeAheadField<Map<String, dynamic>>(
+                  controller: destinationController,
+                  suggestionsCallback: findPlaces,
                   builder: (context, controller, focusNode) {
                     return TextField(
                       controller: controller,
@@ -193,6 +173,27 @@ class _AddRideScreenState extends State<AddRideScreen> {
                         prefixIcon: Icon(Icons.location_on),
                       ),
                     );
+                  },
+                  itemBuilder: (context, suggestion) {
+                    return ListTile(
+                      title: Text(suggestion['name']),
+                      subtitle: Text(suggestion['address']),
+                    );
+                  },
+                  onSelected: (suggestion) {
+                    setState(() {
+                      destinationName = suggestion['name'];
+                      destinationLatLng = LatLng(
+                        suggestion['lat'],
+                        suggestion['lng'],
+                      );
+                      destinationController.text = suggestion['name'];
+                      _mapController.move(destinationLatLng!, 14);
+                    });
+
+                    print(
+                      "DESTINATION PLACE ID: ${suggestion['placeId']}",
+                    ); // ✅ PRINT HERE
                   },
                 ),
 
@@ -218,10 +219,8 @@ class _AddRideScreenState extends State<AddRideScreen> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate:
-                      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  userAgentPackageName:
-                      "com.example.lastmile_transport",
+                  urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                  userAgentPackageName: "com.example.lastmile_transport",
                 ),
                 MarkerLayer(markers: buildMarkers()),
               ],

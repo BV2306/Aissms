@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lastmile_transport/Grouping_feature/temp.dart';
 import 'package:lastmile_transport/app_drawers_screens/Group_feature_screen.dart';
 import 'package:lastmile_transport/app_drawers_screens/Paid_lift_feature.screen.dart';
 // import 'package:manymore/data/insert_locations.dart';
@@ -92,13 +93,7 @@ class AppDrawer extends StatelessWidget {
           //     MaterialPageRoute(builder: (context) => const SignupPage()),
           //   );
           // }),
-          // _drawerItem(context, Icons.vaccines, "insert riders", () {
-          //     Navigator.pop(context);
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(builder: (context) => const InsertRidersPage()),
-          //   );
-          // }),
+         
            _drawerItem(context, Icons.auto_awesome, " group and Ride  ", () {
              
               Navigator.pop(context);
