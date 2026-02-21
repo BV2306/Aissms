@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'provider_register_screen.dart';
-import 'seeker_register_screen.dart';
-import 'provider_dashboard.dart';
-import 'seeker_dashboard.dart';
+import 'Driver/provider_register_screen.dart';
+import 'Seeker/seeker_register_screen.dart';
+import 'Driver/provider_dashboard.dart';
+import 'Seeker/seeker_dashboard.dart';
 
 class CheckUserRoleScreen extends StatefulWidget {
   final String role;
