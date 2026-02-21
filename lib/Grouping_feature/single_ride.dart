@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:lastmile_transport/Grouping_feature/vehicle_recommendation_screen.dart';
 import '../../firebase_options.dart';
 import '../utlis/meter_price.dart';
 void main() async {
@@ -176,21 +177,17 @@ class RidersPage extends StatelessWidget {
   final double pickupLat;
   final double pickupLong;
 
-
   const RidersPage({
     super.key,
     required this.pickupLat,
     required this.pickupLong,
   });
 
-
   double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371;
 
-
     double dLat = (lat2 - lat1) * (pi / 180);
     double dLon = (lon2 - lon1) * (pi / 180);
-
 
     double a =
         sin(dLat / 2) * sin(dLat / 2) +
@@ -199,11 +196,9 @@ class RidersPage extends StatelessWidget {
             sin(dLon / 2) *
             sin(dLon / 2);
 
-
     double c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
-
 
   int calculatePlatformPrice(double distanceKm, String type) {
     if (type == "rickshaw") {
@@ -215,11 +210,9 @@ class RidersPage extends StatelessWidget {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final firestore = FirebaseFirestore.instance;
-
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -234,17 +227,13 @@ class RidersPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-
           final docs = snapshot.data!.docs;
-
 
           final nearbyRiders = docs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
 
-
             double riderLat = data['lat'];
             double riderLong = data['long'];
-
 
             double distance = calculateDistance(
               pickupLat,
@@ -253,125 +242,159 @@ class RidersPage extends StatelessWidget {
               riderLong,
             );
 
-
             return distance <= 0.5;
           }).toList();
-
 
           if (nearbyRiders.isEmpty) {
             return const Center(child: Text("No riders within 500m"));
           }
 
+          // 🔥 Create vehicle list to pass
+          List<Map<String, dynamic>> vehicleList =
+              nearbyRiders.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return {
+              ...data,
+              "pickupLat": pickupLat,
+              "pickupLong": pickupLong,
+            };
+          }).toList();
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: nearbyRiders.length,
-            itemBuilder: (context, index) {
-              final data =
-                  nearbyRiders[index].data() as Map<String, dynamic>;
-
-
-              double riderLat = data['lat'];
-              double riderLong = data['long'];
-
-
-              double distanceKm = calculateDistance(
-                pickupLat,
-                pickupLong,
-                riderLat,
-                riderLong,
-              );
-
-
-              double distanceMeters = distanceKm * 1000;
-
-
-              bool isAuto = data['type'] == "rickshaw";
-
-
-              int meterPrice = PuneFareCalculator.calculateFare(
-                distance: distanceKm,
-                isAuto: isAuto,
-              );
-
-
-              int platformPrice =
-                  calculatePlatformPrice(distanceKm, data['type']);
-
-
-              bool isMeterCheaper = meterPrice < platformPrice;
-
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.shade300,
-                      blurRadius: 6,
-                      spreadRadius: 2,
-                    )
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundColor: Colors.black,
-                      child: Icon(
-                        data['type'] == "cab"
-                            ? Icons.local_taxi
-                            : Icons.electric_rickshaw,
-                        color: Colors.white,
+          return Column(
+            children: [
+              // 🔥 NEW BUTTON ADDED
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VehicleRecommendationScreen(
+                          vehicles: vehicleList,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    );
+                  },
+                  child: const Text(
+                    "Get Optimization",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+
+              // 🔥 Your Original List
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: nearbyRiders.length,
+                  itemBuilder: (context, index) {
+                    final data =
+                        nearbyRiders[index].data() as Map<String, dynamic>;
+
+                    double riderLat = data['lat'];
+                    double riderLong = data['long'];
+
+                    double distanceKm = calculateDistance(
+                      pickupLat,
+                      pickupLong,
+                      riderLat,
+                      riderLong,
+                    );
+
+                    double distanceMeters = distanceKm * 1000;
+
+                    bool isAuto = data['type'] == "rickshaw";
+
+                    int meterPrice = PuneFareCalculator.calculateFare(
+                      distance: distanceKm,
+                      isAuto: isAuto,
+                    );
+
+                    int platformPrice =
+                        calculatePlatformPrice(distanceKm, data['type']);
+
+                    bool isMeterCheaper = meterPrice < platformPrice;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.shade300,
+                            blurRadius: 6,
+                            spreadRadius: 2,
+                          )
+                        ],
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            data['name'],
-                            style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold),
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Colors.black,
+                            child: Icon(
+                              data['type'] == "cab"
+                                  ? Icons.local_taxi
+                                  : Icons.electric_rickshaw,
+                              color: Colors.white,
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "${data['company']} • ${distanceMeters.toStringAsFixed(0)} m away",
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Text(
-                                "Meter: ₹$meterPrice",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isMeterCheaper
-                                      ? Colors.green
-                                      : Colors.black,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  data['name'],
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                "Platform: ₹$platformPrice",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
+                                const SizedBox(height: 4),
+                                Text(
+                                  "${data['company']} • ${distanceMeters.toStringAsFixed(0)} m away",
+                                  style:
+                                      const TextStyle(color: Colors.grey),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Text(
+                                      "Meter: ₹$meterPrice",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: isMeterCheaper
+                                            ? Colors.green
+                                            : const Color.fromARGB(
+                                                255, 43, 17, 17),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      "Platform: ₹$platformPrice",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           );
         },
       ),

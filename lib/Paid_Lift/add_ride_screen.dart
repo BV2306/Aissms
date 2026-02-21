@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:lastmile_transport/Paid_Lift/driver_route_service.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
@@ -62,24 +63,21 @@ class _AddRideScreenState extends State<AddRideScreen> {
     return [];
   }
 
-  Future<void> createRide() async {
-    if (sourceLatLng == null || destinationLatLng == null) return;
+Future<void> createRide() async {
+  if (sourceLatLng == null || destinationLatLng == null) return;
 
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? "unknown_user";
-
-    await FirebaseFirestore.instance.collection("rides").add({
-      "userId": uid,
-      "sourceName": sourceName,
-      "sourceLat": sourceLatLng!.latitude,
-      "sourceLng": sourceLatLng!.longitude,
-      "destinationName": destinationName,
-      "destinationLat": destinationLatLng!.latitude,
-      "destinationLng": destinationLatLng!.longitude,
-      "createdAt": FieldValue.serverTimestamp(),
-    });
-
-    if (mounted) Navigator.pop(context);
-  }
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => DriverRouteScreen(
+        source: sourceLatLng!,
+        destination: destinationLatLng!,
+        sourceName: sourceName,
+        destinationName: destinationName,
+      ),
+    ),
+  );
+}
 
   List<Marker> buildMarkers() {
     List<Marker> markers = [];
