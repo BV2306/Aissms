@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 
 class RideStartedScreen extends StatefulWidget {
   final Map<String, dynamic> bookingData;
@@ -17,34 +18,59 @@ class RideStartedScreen extends StatefulWidget {
 }
 
 class _RideStartedScreenState extends State<RideStartedScreen> {
-  GoogleMapController? mapController;
+  GoogleMapController? _mapController;
 
-  Set<Marker> markers = {};
-  Set<Polyline> polylines = {};
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
 
-  LatLng? sourceLatLng;
-  LatLng? destLatLng;
+  LatLng? _source;
+  LatLng? _destination;
+  LatLng? _userLocation;
 
-  // 🔴 PUT YOUR ORS KEY HERE
+  bool _loading = true;
+
+  // 🔴 PUT YOUR ORS KEY
   static const String orsKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImFlYTdiMjdmM2NlNDY5NTAwYTM0YzNlZDdlYzI5MmM1YTkwMjhlMzQwNjI5OTQ4OTZmOTliZGQ3IiwiaCI6Im11cm11cjY0In0=";
 
   @override
   void initState() {
     super.initState();
-    _initRoute();
+    _initEverything();
   }
 
   // =====================================================
-  // 🔥 MAIN INIT
+  // 🔥 MASTER INIT (runs once only)
   // =====================================================
-  Future<void> _initRoute() async {
-    await _fetchHubCoordinates();
-    await _drawRoute();
-    setState(() {});
+  Future<void> _initEverything() async {
+    try {
+      await _getUserLocation();
+      await _fetchHubCoordinates();
+      await _drawRouteSmart();
+
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    } catch (e) {
+      debugPrint("Init error: $e");
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   // =====================================================
-  // 📍 FETCH HUB COORDINATES FROM FIRESTORE
+  // 📍 USER LOCATION
+  // =====================================================
+  Future<void> _getUserLocation() async {
+    await Geolocator.requestPermission();
+
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    _userLocation = LatLng(pos.latitude, pos.longitude);
+  }
+
+  // =====================================================
+  // 📍 FETCH HUBS
   // =====================================================
   Future<void> _fetchHubCoordinates() async {
     final sourceLocality = widget.bookingData["sourceLocality"];
@@ -52,97 +78,138 @@ class _RideStartedScreenState extends State<RideStartedScreen> {
     final destLocality = widget.bookingData["destLocality"];
     final destHub = widget.bookingData["destinationHub"];
 
-    final firestore = FirebaseFirestore.instance;
+    final fs = FirebaseFirestore.instance;
 
-    // 🔹 SOURCE HUB
-    final sourceDoc = await firestore
+    // SOURCE
+    final sDoc = await fs
         .collection("EV-Hubs")
         .doc(sourceLocality)
         .collection("Hubs")
         .doc(sourceHub)
         .get();
 
-    final sourceData = sourceDoc.data()!;
-    final sourceCoords = sourceData["Up"] ?? sourceData["Down"];
+    final sData = sDoc.data();
+    final sCoords = sData?["Up"] ?? sData?["Down"];
+    _source = LatLng(sCoords["lat"] * 1.0, sCoords["long"] * 1.0);
 
-    sourceLatLng =
-        LatLng(sourceCoords["lat"], sourceCoords["long"]);
-
-    // 🔹 DEST HUB
-    final destDoc = await firestore
+    // DEST
+    final dDoc = await fs
         .collection("EV-Hubs")
         .doc(destLocality)
         .collection("Hubs")
         .doc(destHub)
         .get();
 
-    final destData = destDoc.data()!;
-    final destCoords = destData["Up"] ?? destData["Down"];
+    final dData = dDoc.data();
+    final dCoords = dData?["Up"] ?? dData?["Down"];
+    _destination =
+        LatLng(dCoords["lat"] * 1.0, dCoords["long"] * 1.0);
 
-    destLatLng =
-        LatLng(destCoords["lat"], destCoords["long"]);
-
-    // 🔹 markers
-    markers.add(
+    // markers
+    _markers.add(
       Marker(
         markerId: const MarkerId("source"),
-        position: sourceLatLng!,
-        infoWindow: const InfoWindow(title: "Source Hub"),
+        position: _source!,
         icon: BitmapDescriptor.defaultMarkerWithHue(
             BitmapDescriptor.hueGreen),
       ),
     );
 
-    markers.add(
+    _markers.add(
       Marker(
-        markerId: const MarkerId("destination"),
-        position: destLatLng!,
-        infoWindow: const InfoWindow(title: "Destination Hub"),
+        markerId: const MarkerId("dest"),
+        position: _destination!,
         icon: BitmapDescriptor.defaultMarkerWithHue(
             BitmapDescriptor.hueRed),
+      ),
+    );
+
+    _markers.add(
+      Marker(
+        markerId: const MarkerId("user"),
+        position: _userLocation!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure),
       ),
     );
   }
 
   // =====================================================
-  // 🧭 DRAW ROUTE USING ORS
+  // 🧠 SMART ROUTING LOGIC
   // =====================================================
-  Future<void> _drawRoute() async {
-    if (sourceLatLng == null || destLatLng == null) return;
+  Future<void> _drawRouteSmart() async {
+    if (_userLocation == null ||
+        _source == null ||
+        _destination == null) return;
 
-    final response = await http.post(
-      Uri.parse(
-          "https://api.openrouteservice.org/v2/directions/driving-car/geojson"),
-      headers: {
-        "Authorization": orsKey,
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "coordinates": [
-          [sourceLatLng!.longitude, sourceLatLng!.latitude],
-          [destLatLng!.longitude, destLatLng!.latitude],
-        ]
-      }),
+    // distance user → source
+    final distToSource = Geolocator.distanceBetween(
+      _userLocation!.latitude,
+      _userLocation!.longitude,
+      _source!.latitude,
+      _source!.longitude,
     );
 
-    if (response.statusCode != 200) return;
+    // 🚀 CASE 1: user far from source → route user → source → dest
+    if (distToSource > 120) {
+      await _drawRoute(_userLocation!, _source!,
+          id: "user_to_source", color: Colors.orange);
 
-    final data = jsonDecode(response.body);
-    final coords =
-        data["features"][0]["geometry"]["coordinates"] as List;
+      await _drawRoute(_source!, _destination!,
+          id: "source_to_dest", color: Colors.blue);
+    }
+    // 🚀 CASE 2: user already near source → only source → dest
+    else {
+      await _drawRoute(_source!, _destination!,
+          id: "source_to_dest", color: Colors.blue);
+    }
+  }
 
-    final points = coords
-        .map<LatLng>((c) => LatLng(c[1], c[0]))
-        .toList();
+  // =====================================================
+  // 🧭 ORS ROUTE DRAW
+  // =====================================================
+  Future<void> _drawRoute(
+    LatLng start,
+    LatLng end, {
+    required String id,
+    required Color color,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse(
+            "https://api.openrouteservice.org/v2/directions/driving-car/geojson"),
+        headers: {
+          "Authorization": orsKey,
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "coordinates": [
+            [start.longitude, start.latitude],
+            [end.longitude, end.latitude],
+          ]
+        }),
+      );
 
-    polylines.add(
-      Polyline(
-        polylineId: const PolylineId("ride_route"),
-        points: points,
-        width: 6,
-        color: Colors.blue,
-      ),
-    );
+      if (res.statusCode != 200) return;
+
+      final data = jsonDecode(res.body);
+      final coords =
+          data["features"][0]["geometry"]["coordinates"] as List;
+
+      final pts =
+          coords.map<LatLng>((c) => LatLng(c[1], c[0])).toList();
+
+      _polylines.add(
+        Polyline(
+          polylineId: PolylineId(id),
+          points: pts,
+          width: 6,
+          color: color,
+        ),
+      );
+    } catch (e) {
+      debugPrint("ORS error: $e");
+    }
   }
 
   // =====================================================
@@ -150,7 +217,7 @@ class _RideStartedScreenState extends State<RideStartedScreen> {
   // =====================================================
   @override
   Widget build(BuildContext context) {
-    if (sourceLatLng == null || destLatLng == null) {
+    if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -158,54 +225,83 @@ class _RideStartedScreenState extends State<RideStartedScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Ride Started"),
+        title: const Text("Navigation"),
         backgroundColor: Colors.green,
       ),
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(
-          target: sourceLatLng!,
-          zoom: 14,
-        ),
-        markers: markers,
-        polylines: polylines,
-        myLocationEnabled: true,
-        onMapCreated: (controller) {
-          mapController = controller;
-          _fitCamera();
-        },
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _userLocation!,
+              zoom: 14,
+            ),
+            markers: _markers,
+            polylines: _polylines,
+            myLocationEnabled: true,
+            onMapCreated: (c) {
+              _mapController = c;
+              _fitCamera();
+            },
+          ),
+
+          // 🚀 START RIDE BUTTON
+          Positioned(
+            bottom: 30,
+            left: 20,
+            right: 20,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Ride Started 🚴")),
+                );
+              },
+              child: const Text(
+                "Start Ride",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          )
+        ],
       ),
     );
   }
 
   // =====================================================
-  // 🎯 FIT CAMERA TO ROUTE
+  // 🎯 FIT CAMERA
   // =====================================================
   void _fitCamera() {
-    if (mapController == null ||
-        sourceLatLng == null ||
-        destLatLng == null) return;
+    if (_mapController == null ||
+        _userLocation == null ||
+        _destination == null) return;
 
     final bounds = LatLngBounds(
       southwest: LatLng(
-        sourceLatLng!.latitude < destLatLng!.latitude
-            ? sourceLatLng!.latitude
-            : destLatLng!.latitude,
-        sourceLatLng!.longitude < destLatLng!.longitude
-            ? sourceLatLng!.longitude
-            : destLatLng!.longitude,
+        _userLocation!.latitude < _destination!.latitude
+            ? _userLocation!.latitude
+            : _destination!.latitude,
+        _userLocation!.longitude < _destination!.longitude
+            ? _userLocation!.longitude
+            : _destination!.longitude,
       ),
       northeast: LatLng(
-        sourceLatLng!.latitude > destLatLng!.latitude
-            ? sourceLatLng!.latitude
-            : destLatLng!.latitude,
-        sourceLatLng!.longitude > destLatLng!.longitude
-            ? sourceLatLng!.longitude
-            : destLatLng!.longitude,
+        _userLocation!.latitude > _destination!.latitude
+            ? _userLocation!.latitude
+            : _destination!.latitude,
+        _userLocation!.longitude > _destination!.longitude
+            ? _userLocation!.longitude
+            : _destination!.longitude,
       ),
     );
 
-    mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(bounds, 80),
-    );
+    _mapController!
+        .animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
   }
 }
+
