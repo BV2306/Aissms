@@ -5,7 +5,8 @@ import 'package:lastmile_transport/Offline_Booking_hub/Offline_Booking_using_Qa.
 import 'package:lastmile_transport/app_drawers_screens/Group_feature_screen.dart';
 import 'package:lastmile_transport/app_drawers_screens/Paid_lift_feature.screen.dart';
 import 'package:lastmile_transport/chatbot/chatbot_screen.dart';
-import 'package:lastmile_transport/convoy/convoy_learning_screen.dart';
+import 'package:lastmile_transport/convoy/covoy.dart';
+
 // import 'package:manymore/data/insert_locations.dart';
 // import 'package:manymore/data/insert_riders.dart';
 // import 'package:manymore/data/locations_list.dart';
@@ -103,7 +104,34 @@ class AppDrawer extends StatelessWidget {
               );
             },
           ),
-
+          _drawerItem(
+            context,
+            Icons.ev_station,
+            "Neighbour Convoy",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ConvoyMapSimulationScreen(),
+                ),
+              );
+            },
+          ),
+          _drawerItem(
+            context,
+            Icons.ev_station,
+            "Metro Sync",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MetroBookingScreen(),
+                ),
+              );
+            },
+          ),
           _drawerItem(
             context,
             Icons.groups_rounded,

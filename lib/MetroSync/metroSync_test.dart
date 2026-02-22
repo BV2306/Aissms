@@ -1,604 +1,689 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:math' as math;
+import 'dart:async';
 
-class MetroSmartHubDemo extends StatefulWidget {
-  const MetroSmartHubDemo({super.key});
 
-  @override
-  State<MetroSmartHubDemo> createState() => _MetroSmartHubDemoState();
+// -----------------------------------------------------------------------------
+// MODELS
+// -----------------------------------------------------------------------------
+class RideGroup {
+  final String title;
+  final List<Map<String, dynamic>> vehicles;
+
+
+  RideGroup({required this.title, required this.vehicles});
 }
 
-class _MetroSmartHubDemoState extends State<MetroSmartHubDemo>
-    with SingleTickerProviderStateMixin {
-  int remainingSeconds = 30;
-  bool isSearching = false;
-  bool syncing = false;
-  bool rideReady = false;
-  String selectedRide = "";
-  String? selectedDestination;
-  Timer? timer;
 
-  late AnimationController _metroAnimController;
-  late Animation<Offset> _metroAnimation;
+class MetroStation {
+  final String name;
+  final double lat;
+  final double lon;
 
-  // Real-time user location
-  LatLng? userLocation;
-  bool isLoadingLocation = true;
 
-  // Comprehensive list of Pune Metro Stations
-  final List<String> puneDestinations = [
-    "Anand Nagar Metro Station",
-    "Bhosari (Nashik Phata) Metro Station",
-    "Bopodi Metro Station",
-    "Budhwar Peth Metro Station",
-    "Bund Garden Metro Station",
-    "Chhatrapati Sambhaji Udyan Metro Station",
-    "Civil Court Metro Station",
-    "Dapodi Metro Station",
-    "Deccan Gymkhana Metro Station",
-    "Garware College Metro Station",
-    "Ideal Colony Metro Station",
-    "Kalyani Nagar Metro Station",
-    "Kasarwadi Metro Station",
-    "Khadki Metro Station",
-    "Mandai Metro Station",
-    "Mangalwar Peth Metro Station",
-    "Nal Stop Metro Station",
-    "PCMC Metro Station",
-    "Phugewadi Metro Station",
-    "PMC Metro Station",
-    "Pune Railway Station Metro Station",
-    "Ramwadi Metro Station",
-    "Range Hill Metro Station",
-    "Ruby Hall Clinic Metro Station",
-    "Sant Tukaram Nagar Metro Station",
-    "Shivaji Nagar Metro Station",
-    "Swargate Metro Station",
-    "Vanaz Metro Station",
-    "Yerawada Metro Station"
+  MetroStation(this.name, this.lat, this.lon);
+}
+
+
+// -----------------------------------------------------------------------------
+// MAIN WIDGET
+// -----------------------------------------------------------------------------
+class MetroBookingScreen extends StatefulWidget {
+  const MetroBookingScreen({Key? key}) : super(key: key);
+
+
+  @override
+  _MetroBookingScreenState createState() => _MetroBookingScreenState();
+}
+
+
+class _MetroBookingScreenState extends State<MetroBookingScreen> {
+  // 1. All Pune Metro Stations (Dummy Coordinates for real-life scaling)
+  final List<MetroStation> stations = [
+    MetroStation("PCMC", 18.6298, 73.7997),
+    MetroStation("Sant Tukaram Nagar", 18.6180, 73.8056),
+    MetroStation("Bhosari", 18.6110, 73.8120),
+    MetroStation("Kasarwadi", 18.6030, 73.8200),
+    MetroStation("Phugewadi", 18.5950, 73.8270),
+    MetroStation("Dapodi", 18.5830, 73.8340),
+    MetroStation("Bopodi", 18.5720, 73.8410),
+    MetroStation("Shivajinagar", 18.5314, 73.8552),
+    MetroStation("Civil Court", 18.5285, 73.8565),
+    MetroStation("Pune Railway Station", 18.5289, 73.8744),
+    MetroStation("Ruby Hall Clinic", 18.5330, 73.8810),
+    MetroStation("Bund Garden", 18.5360, 73.8870),
+    MetroStation("Kalyani Nagar", 18.5482, 73.9015),
+    MetroStation("Ramwadi", 18.5530, 73.9120),
   ];
 
-  late Map<String, Map<String, dynamic>> rideOptions;
+
+  MetroStation? selectedSource;
+  MetroStation? selectedDestination;
+
+
+  bool isJourneyActive = false;
+  String journeyStatus = "Select stations to start journey";
+  double journeyProgress = 0.0;
+  Timer? journeyTimer;
+
+
+  bool isLoading = false;
+  bool isOptimized = false;
+  List<RideGroup> displayGroups = [];
+
 
   @override
   void initState() {
     super.initState();
-    // Initialize animation for the moving metro
-    _metroAnimController = AnimationController(
-      duration: const Duration(seconds: 4),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _metroAnimation = Tween<Offset>(
-      begin: const Offset(-0.5, 0.0), // Start slightly left
-      end: const Offset(0.5, 0.0), // Move to slightly right
-    ).animate(CurvedAnimation(
-      parent: _metroAnimController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Fetch user's actual location
-    _determinePosition();
+    selectedSource = stations[0]; // Default PCMC
+    selectedDestination = stations[7]; // Default Shivajinagar
   }
 
-  Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
 
-    // Test if location services are enabled.
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _setFallbackLocation();
-      return;
+  @override
+  void dispose() {
+    journeyTimer?.cancel();
+    super.dispose();
+  }
+
+
+  // -----------------------------------------------------------------------------
+  // MATH & LOGIC
+  // -----------------------------------------------------------------------------
+
+
+  // Haversine formula to calculate distance in kilometers
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
+    const double R = 6371.0; // Earth radius in km
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLon = _degreesToRadians(lon2 - lon1);
+
+
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+
+
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return R * c;
+  }
+
+
+  double _degreesToRadians(double degrees) {
+    return degrees * math.pi / 180;
+  }
+
+
+  // Generate dynamic drivers around the DESTINATION station
+  List<Map<String, dynamic>> _generateDriversNear(MetroStation destination) {
+    final random = math.Random();
+    List<Map<String, dynamic>> generatedDrivers = [];
+    List<String> companies = ['ola', 'uber', 'rapido', 'namma yatri'];
+    List<String> types = ['cab', 'bike', 'rickshaw'];
+
+
+    for (int i = 0; i < 15; i++) {
+      // Offset coordinates by roughly 0 to 3 km max
+      double latOffset = (random.nextDouble() - 0.5) * 0.03;
+      double lonOffset = (random.nextDouble() - 0.5) * 0.03;
+
+
+      double driverLat = destination.lat + latOffset;
+      double driverLon = destination.lon + lonOffset;
+
+
+      // Calculate how far the driver is from the station
+      double distKm = _calculateDistance(
+          driverLat, driverLon, destination.lat, destination.lon);
+
+
+      // Assume city speed of 25 km/h -> Time = Distance / Speed
+      int etaMins = ((distKm / 25.0) * 60).round();
+      if (etaMins < 1) etaMins = 1; // Minimum 1 min ETA
+
+
+      String type = types[random.nextInt(types.length)];
+      String company = companies[random.nextInt(companies.length)];
+
+
+      generatedDrivers.add({
+        "name": "$type-${random.nextInt(900) + 100}",
+        "company": company,
+        "type": type,
+        "eta": etaMins, // Time to reach the station
+        "dist": double.parse(distKm.toStringAsFixed(1)),
+        "fare": (distKm * 15 + 30).round(), // Mock fare calculation
+      });
     }
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _setFallbackLocation();
-        return;
-      }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      _setFallbackLocation();
-      return;
-    }
-
-    // Get current position
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    
-    _initializeVehiclesNearLocation(LatLng(position.latitude, position.longitude));
+    // Sort by ETA ascending
+    generatedDrivers
+        .sort((a, b) => (a['eta'] as int).compareTo(b['eta'] as int));
+    return generatedDrivers;
   }
 
-  void _setFallbackLocation() {
-    // Default to Pune Swargate if location fails/denied
-    _initializeVehiclesNearLocation(const LatLng(18.5018, 73.8636));
-  }
 
-  void _initializeVehiclesNearLocation(LatLng location) {
-    setState(() {
-      userLocation = location;
-      // Dynamically generate vehicle coordinates slightly offset from user's REAL location
-      rideOptions = {
-        "Smart Hub Bike": {
-          "icon": "🚲",
-          "message": "Your bike is ready at Exit Gate 2",
-          "number": "MH-12-BK-9921",
-          "driver": "Self-driven",
-          "model": "Yulu Miracle",
-          "lat": location.latitude + 0.0012, // slightly north
-          "lng": location.longitude + 0.0015, // slightly east
-        },
-        "Auto": {
-          "icon": "🛵",
-          "message": "Your auto is waiting at Exit Gate 3",
-          "number": "MH-12-AU-4521",
-          "driver": "Suresh Kale",
-          "model": "Bajaj RE",
-          "lat": location.latitude - 0.0015, // slightly south
-          "lng": location.longitude + 0.0010,
-        },
-        "Cab": {
-          "icon": "🚕",
-          "message": "Your cab is arriving at Pickup Zone A",
-          "number": "MH-12-CB-1122",
-          "driver": "Prakash Patil",
-          "model": "Maruti Dzire",
-          "lat": location.latitude + 0.0020,
-          "lng": location.longitude - 0.0018,
-        },
-        "Bike Taxi": {
-          "icon": "🏍️",
-          "message": "Your bike taxi captain is ready at Gate 1",
-          "number": "MH-14-BT-7744",
-          "driver": "Amit",
-          "model": "Honda Activa",
-          "lat": location.latitude - 0.0010,
-          "lng": location.longitude - 0.0020,
-        },
-      };
-      isLoadingLocation = false;
-    });
-  }
-
-  void confirmBooking(String ride) {
-    if (selectedDestination == null) {
+  // -----------------------------------------------------------------------------
+  // SIMULATION PIPELINE
+  // -----------------------------------------------------------------------------
+  void _startJourneySimulation() {
+    if (selectedSource == null || selectedDestination == null) return;
+    if (selectedSource == selectedDestination) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a destination first!")),
+        const SnackBar(
+            content: Text('Source and Destination cannot be the same!')),
       );
       return;
     }
 
+
+    // 1. Calculate Metro Journey Distance and Time
+    double journeyDistKm = _calculateDistance(
+        selectedSource!.lat,
+        selectedSource!.lon,
+        selectedDestination!.lat,
+        selectedDestination!.lon);
+
+
+    // Assume metro goes ~35 km/h in a straight line
+    int totalJourneyMins = ((journeyDistKm / 35.0) * 60).round();
+    if (totalJourneyMins < 6)
+      totalJourneyMins = 8; // Force a minimum time for demo purposes
+
+
+    // 2. Determine Trigger Time (5 mins before arrival)
+    int driverBufferMins = 5;
+    int triggerTimeMins = totalJourneyMins - driverBufferMins;
+
+
     setState(() {
-      selectedRide = ride;
-      isSearching = true;
+      isJourneyActive = true;
+      journeyProgress = 0.0;
+      journeyStatus =
+          "Traveling from ${selectedSource!.name} to ${selectedDestination!.name}\nETA: $totalJourneyMins mins";
+      displayGroups.clear(); // Clear old rides
     });
 
-    Future.delayed(const Duration(milliseconds: 3500), () {
-      if (!mounted) return;
+
+    // HACKATHON TIME SCALE: 1 simulated minute = 1 real second
+    int currentSimulatedMin = 0;
+
+
+    journeyTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      currentSimulatedMin++;
+
 
       setState(() {
-        isSearching = false;
+        journeyProgress = currentSimulatedMin / totalJourneyMins;
+        journeyStatus =
+            "In Transit... Arriving in ${totalJourneyMins - currentSimulatedMin} mins";
       });
 
-      startSync();
+
+      // TRIGGER THE BOOKING PROMPT
+      if (currentSimulatedMin == triggerTimeMins) {
+        timer.cancel(); // Pause journey so they can book
+        _showSmartBookingPrompt(
+            selectedDestination!, totalJourneyMins - currentSimulatedMin);
+      }
     });
   }
 
-  void startSync() {
-    setState(() {
-      syncing = true;
-    });
 
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
+  void _showSmartBookingPrompt(MetroStation destination, int minsRemaining) {
+    // Generate the dummy drivers dynamically
+    List<Map<String, dynamic>> nearbyDrivers =
+        _generateDriversNear(destination);
 
-      setState(() {
-        remainingSeconds--;
-      });
 
-      if (remainingSeconds == 10) {
-        setState(() {
-          rideReady = true;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green,
-            content: Text(
-              "${rideOptions[selectedRide]!["icon"]} ${rideOptions[selectedRide]!["message"]}",
-            ),
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.train, color: Colors.blueAccent, size: 28),
+              SizedBox(width: 10),
+              Text("Arriving Soon!",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
           ),
-        );
-      }
-
-      if (remainingSeconds <= 0) {
-        timer.cancel();
-      }
-    });
-  }
-
-  String formatTime(int seconds) {
-    final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
-    final secs = (seconds % 60).toString().padLeft(2, '0');
-    return "$minutes:$secs";
-  }
-
-  @override
-  void dispose() {
-    timer?.cancel();
-    _metroAnimController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Pune Metro Smart Sync")),
-      body: isLoadingLocation
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text("Detecting your location..."),
-                ],
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "You will reach ${destination.name} in $minsRemaining minutes.",
+                style: const TextStyle(fontSize: 16),
               ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Animated Moving Metro instead of static icon
-                  SizedBox(
-                    height: 100,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Draw a track line
-                        Container(
-                          height: 4,
-                          width: 200,
-                          color: Colors.grey.shade300,
-                        ),
-                        SlideTransition(
-                          position: _metroAnimation,
-                          child: const Icon(Icons.directions_subway,
-                              size: 80, color: Colors.blueAccent),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Dynamically show the current location Coordinates
-                  Text(
-                    "Arriving at Current Location\n(${userLocation!.latitude.toStringAsFixed(4)}, ${userLocation!.longitude.toStringAsFixed(4)})",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // 1. Initial State: Choosing Destination & Ride
-                  if (!isSearching && !syncing) ...[
-                    // Destination Selection Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade400),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          hint: const Text("Where are you heading?"),
-                          value: selectedDestination,
-                          icon:
-                              const Icon(Icons.location_on, color: Colors.red),
-                          items: puneDestinations.map((String dest) {
-                            return DropdownMenuItem<String>(
-                              value: dest,
-                              child: Text(dest,
-                                  style: const TextStyle(fontSize: 16)),
-                            );
-                          }).toList(),
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedDestination = newValue;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 25),
-
-                    const Text(
-                      "Choose Your Ride",
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 15),
-
-                    ...rideOptions.keys.map((ride) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton.icon(
-                            onPressed: selectedDestination == null
-                                ? null // Disable buttons until destination is selected
-                                : () => confirmBooking(ride),
-                            icon: Text(rideOptions[ride]!["icon"],
-                                style: const TextStyle(fontSize: 20)),
-                            label: Text(ride,
-                                style: const TextStyle(fontSize: 16)),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ],
-
-                  // 2. Searching State
-                  if (isSearching) ...[
-                    const SizedBox(height: 40),
-                    const CircularProgressIndicator(color: Colors.black87),
-                    const SizedBox(height: 30),
-                    Text(
-                      "Locating nearest $selectedRide...",
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      "Booking trip to $selectedDestination.\nConfirming vehicle details with the hub.",
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-
-                  // 3. Syncing State: Ride confirmed, showing details & timer
-                  if (syncing) ...[
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            Text(
-                              rideOptions[selectedRide]!["icon"],
-                              style: const TextStyle(fontSize: 40),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              "Booking Confirmed to $selectedDestination",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.green[700],
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              rideOptions[selectedRide]!["number"],
-                              style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5),
-                            ),
-                            const Divider(height: 30),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text("Model",
-                                        style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 12)),
-                                    Text(rideOptions[selectedRide]!["model"],
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text("Driver",
-                                        style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 12)),
-                                    Text(rideOptions[selectedRide]!["driver"],
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ],
-                            )
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    const Text(
-                      "Syncing ride with metro arrival...",
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 10),
-
-                    Text(
-                      formatTime(remainingSeconds),
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: rideReady ? Colors.green : Colors.black87,
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.flash_on, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "We found ${nearbyDrivers.length} drivers 2-5 mins away from the station. Book now to avoid waiting.",
+                        style: TextStyle(
+                            color: Colors.green.shade800, fontSize: 13),
                       ),
                     ),
                   ],
-
-                  // 4. Ride Ready State
-                  if (rideReady) ...[
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => VehicleLocationMapScreen(
-                                vehicleDetails: rideOptions[selectedRide]!,
-                                userLocation: userLocation!,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.map),
-                        label: const Text("View Map & Start Ride",
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black87,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              )
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _finishJourney();
+              },
+              child:
+                  const Text("I'll wait", style: TextStyle(color: Colors.grey)),
             ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _processBookings(nearbyDrivers);
+                _finishJourney();
+              },
+              child: const Text("Show Rides"),
+            ),
+          ],
+        );
+      },
     );
   }
-}
 
-// -----------------------------------------------------------------------------
-// Map Screen
-// -----------------------------------------------------------------------------
 
-class VehicleLocationMapScreen extends StatelessWidget {
-  final Map<String, dynamic> vehicleDetails;
-  final LatLng userLocation;
+  void _processBookings(List<Map<String, dynamic>> rawDrivers) {
+    setState(() {
+      isLoading = true;
+    });
 
-  const VehicleLocationMapScreen({
-    super.key,
-    required this.vehicleDetails,
-    required this.userLocation,
-  });
 
+    // Simulate an API call / Optimization calculation delay
+    Future.delayed(const Duration(seconds: 1), () {
+      List<RideGroup> newGroups = [];
+
+
+      // Group 1: Perfect Matches (Drivers <= 5 mins away)
+      List<Map<String, dynamic>> perfectMatches =
+          rawDrivers.where((d) => d['eta'] <= 5).toList();
+      if (perfectMatches.isNotEmpty) {
+        newGroups.add(RideGroup(
+            title: "🏆 Perfect Timing (Arriving as you step out)",
+            vehicles: perfectMatches));
+      }
+
+
+      // Group 2: Others (Drivers > 5 mins away)
+      List<Map<String, dynamic>> others =
+          rawDrivers.where((d) => d['eta'] > 5).toList();
+      if (others.isNotEmpty) {
+        newGroups.add(RideGroup(
+            title: "⏳ Slight Wait (Arriving shortly after)", vehicles: others));
+      }
+
+
+      setState(() {
+        displayGroups = newGroups;
+        isLoading = false;
+        isOptimized = true;
+      });
+    });
+  }
+
+
+  void _finishJourney() {
+    setState(() {
+      journeyProgress = 1.0;
+      journeyStatus = "Arrived at ${selectedDestination!.name}!";
+      isJourneyActive = false;
+    });
+  }
+
+
+  // -----------------------------------------------------------------------------
+  // UI BUILDER
+  // -----------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    final LatLng vehicleLocation =
-        LatLng(vehicleDetails["lat"], vehicleDetails["lng"]);
-
     return Scaffold(
-      appBar: AppBar(title: const Text("Locate Your Ride")),
+      backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(
+        title: const Text("Micro Transit Booking",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+      ),
       body: Column(
         children: [
+          // SIMULATION CONTROLS
           Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.blue.withOpacity(0.1),
-            child: Row(
-              children: [
-                Text(vehicleDetails["icon"],
-                    style: const TextStyle(fontSize: 30)),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(vehicleDetails["message"],
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text("Vehicle: ${vehicleDetails["number"]}"),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: userLocation,
-                initialZoom: 16,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate:
-                      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  userAgentPackageName: "com.example.lastmile_transport",
-                ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: [userLocation, vehicleLocation],
-                      strokeWidth: 4,
-                      color: Colors.blueAccent,
-                      isDotted: true,
-                    ),
-                  ],
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: userLocation,
-                      width: 50,
-                      height: 50,
-                      child: const Icon(Icons.person_pin_circle,
-                          color: Colors.blue, size: 40),
-                    ),
-                    Marker(
-                      point: vehicleLocation,
-                      width: 50,
-                      height: 50,
-                      child: const Icon(Icons.location_on,
-                          color: Colors.green, size: 40),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Padding(
             padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text("Scan QR to Unlock",
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+            decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 10,
+                      offset: Offset(0, 4))
+                ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<MetroStation>(
+                        decoration: const InputDecoration(
+                            labelText: "From", border: OutlineInputBorder()),
+                        value: selectedSource,
+                        isExpanded: true,
+                        items: stations
+                            .map((s) =>
+                                DropdownMenuItem(value: s, child: Text(s.name)))
+                            .toList(),
+                        onChanged: isJourneyActive
+                            ? null
+                            : (val) => setState(() => selectedSource = val),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<MetroStation>(
+                        decoration: const InputDecoration(
+                            labelText: "To", border: OutlineInputBorder()),
+                        value: selectedDestination,
+                        isExpanded: true,
+                        items: stations
+                            .map((s) =>
+                                DropdownMenuItem(value: s, child: Text(s.name)))
+                            .toList(),
+                        onChanged: isJourneyActive
+                            ? null
+                            : (val) =>
+                                setState(() => selectedDestination = val),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 16),
+
+
+                // Progress Bar
+                if (isJourneyActive || journeyProgress == 1.0) ...[
+                  LinearProgressIndicator(
+                    value: journeyProgress,
+                    backgroundColor: Colors.grey.shade200,
+                    color: Colors.blueAccent,
+                    minHeight: 8,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(journeyStatus,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.bold)),
+                ],
+
+
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        isJourneyActive ? Colors.red.shade400 : Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: isJourneyActive
+                      ? () {
+                          journeyTimer?.cancel();
+                          setState(() => isJourneyActive = false);
+                        }
+                      : _startJourneySimulation,
+                  icon: Icon(
+                      isJourneyActive ? Icons.stop : Icons.directions_transit),
+                  label: Text(
+                      isJourneyActive
+                          ? "Stop Simulation"
+                          : "Start Metro Journey",
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+
+
+          // LOADING STATE
+          if (isLoading)
+            const Expanded(child: Center(child: CircularProgressIndicator())),
+
+
+          // GROUPED RIDES LIST
+          if (!isLoading && displayGroups.isNotEmpty)
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                itemCount: displayGroups.length,
+                itemBuilder: (context, groupIndex) {
+                  final group = displayGroups[groupIndex];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0, vertical: 8.0),
+                          child: Text(
+                            group.title,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.blueGrey.shade800),
+                          ),
+                        ),
+                        ...group.vehicles
+                            .map((vehicle) => _buildVehicleCard(vehicle))
+                            .toList(),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
-          )
+
+
+          if (!isLoading && displayGroups.isEmpty && !isJourneyActive)
+            Expanded(
+              child: Center(
+                child: Text("Start a journey to see smart recommendations.",
+                    style:
+                        TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+              ),
+            )
         ],
       ),
     );
   }
+
+
+  // Modernized Card Widget
+  Widget _buildVehicleCard(Map<String, dynamic> vehicle) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(_getIconForType(vehicle["type"]),
+                  color: Colors.blue.shade700, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(vehicle["name"].toString().toUpperCase(),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(vehicle["company"].toString().toUpperCase(),
+                          style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: Colors.orange.shade100,
+                            borderRadius: BorderRadius.circular(4)),
+                        child: Text("${vehicle['eta']} min away",
+                            style: TextStyle(
+                                color: Colors.orange.shade800,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold)),
+                      )
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Padding(
+                //   padding: const EdgeInsets.only(bottom: 8.0),
+                //   child: Text("₹${vehicle["fare"]}",
+                //       style: const TextStyle(
+                //           fontWeight: FontWeight.w900,
+                //           fontSize: 18,
+                //           color: Colors.black87)),
+                // ),
+                SizedBox(
+                  height: 36,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(
+                              'Booking ${vehicle["name"]}... Driver will meet you at the exit!')));
+                    },
+                    child: const Text("Book",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  IconData _getIconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'cab':
+        return Icons.directions_car;
+      case 'bike':
+        return Icons.two_wheeler;
+      case 'rickshaw':
+        return Icons.electric_rickshaw;
+      default:
+        return Icons.commute;
+    }
+  }
+
+
+  Future<void> _openRideApp(String company) async {
+    Uri url;
+
+
+    switch (company.toLowerCase()) {
+      case 'ola':
+        url = Uri.parse('https://book.olacabs.com/');
+        break;
+      case 'uber':
+        url = Uri.parse('https://m.uber.com/');
+        break;
+      case 'rapido':
+        url = Uri.parse('https://www.rapido.bike/');
+        break;
+      case 'namma yatri':
+        url = Uri.parse('https://nammayatri.in/');
+        break;
+      default:
+        return;
+    }
+
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Could not open ride app")),
+      );
+    }
+  }
 }
+
+
+
+
+
+
