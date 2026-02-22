@@ -37,12 +37,20 @@ class _SeekerRideTrackingScreenState extends State<SeekerRideTrackingScreen> {
         .onValue
         .listen((event) {
       if (!event.snapshot.exists || !mounted) return;
-      final data = Map<dynamic, dynamic>.from(event.snapshot.value as Map);
-      setState(() => driverLocation = LatLng(
-        (data['lat'] as num).toDouble(),
-        (data['lng'] as num).toDouble(),
-      ));
-      _recenterMap();
+      try {
+        final data = Map<dynamic, dynamic>.from(event.snapshot.value as Map);
+        final lat = data['lat'];
+        final lng = data['lng'];
+        if (lat != null && lng != null) {
+          setState(() => driverLocation = LatLng(
+            (lat as num).toDouble(),
+            (lng as num).toDouble(),
+          ));
+          _recenterMap();
+        }
+      } catch (e) {
+        debugPrint("Error parsing driver location: $e");
+      }
     });
   }
 
