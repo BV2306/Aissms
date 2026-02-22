@@ -5,7 +5,8 @@ import 'package:lastmile_transport/Offline_Booking_hub/Offline_Booking_using_Qa.
 import 'package:lastmile_transport/app_drawers_screens/Group_feature_screen.dart';
 import 'package:lastmile_transport/app_drawers_screens/Paid_lift_feature.screen.dart';
 import 'package:lastmile_transport/chatbot/chatbot_screen.dart';
-import 'package:lastmile_transport/convoy/convoy_learning_screen.dart';
+import 'package:lastmile_transport/convoy/covoy.dart';
+
 // import 'package:manymore/data/insert_locations.dart';
 // import 'package:manymore/data/insert_riders.dart';
 // import 'package:manymore/data/locations_list.dart';
@@ -60,69 +61,89 @@ class AppDrawer extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // _drawerItem(context, Icons.dashboard, "Payment Integration", () {
-          //   Navigator.pop(context);
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(
-          //       builder: (context) => const PaymentScreen(
-          //         amount: 0,
-          //         cycleId: "demo_cycle",
-          //         cycleNumber: "DEMO-001",
-          //       ),
-          //     ),
-          //   );
-          // }),
+          // 🔹 MENU ITEMS
+          _drawerItem(
+            context,
+            Icons.smart_toy_outlined,
+            "Chatbot",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatScreen()),
+              );
+            },
+          ),
 
-          // _drawerItem(context, Icons.favorite, "Otp Verification", () {}),
-          _drawerItem(context, Icons.bedtime, "Chatbot  ", () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ChatApp()),
-            );
-          }),
-          _drawerItem(context, Icons.ev_station, "Offline Booking", () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const EvHubOfflineChatbotScreen(),
-              ),
-            );
-          }),
-           _drawerItem(context, Icons.ev_station, "Metro Sync", () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MetroSmartHubDemo(),
-              ),
-            );
-          }),
-          _drawerItem(context, Icons.auto_awesome, " group and Ride  ", () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const RidesPage()),
-            );
-          }),
-           _drawerItem(context, Icons.auto_awesome, " Convoy grouping  ", () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ConvoyLearningScreen()),
-            );
-          }),
-          _drawerItem(context, Icons.pedal_bike, "Payed Lift  ", () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const RoleSelectionScreen(),
-              ),
-            );
-          }),
+          _drawerItem(
+            context,
+            Icons.ev_station,
+            "Offline Booking",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const EvHubOfflineChatbotScreen(),
+                ),
+              );
+            },
+          ),
+          _drawerItem(
+            context,
+            Icons.ev_station,
+            "Neighbour Convoy",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ConvoyMapSimulationScreen(),
+                ),
+              );
+            },
+          ),
+          _drawerItem(
+            context,
+            Icons.ev_station,
+            "Metro Sync",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MetroBookingScreen(),
+                ),
+              );
+            },
+          ),
+          _drawerItem(
+            context,
+            Icons.groups_rounded,
+            "Group & Ride",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RidesPage()),
+              );
+            },
+          ),
+
+          _drawerItem(
+            context,
+            Icons.pedal_bike_rounded,
+            "Paid Lift",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const RoleSelectionScreen()),
+              );
+            },
+          ),
+
           const Spacer(),
           const Divider(),
 
