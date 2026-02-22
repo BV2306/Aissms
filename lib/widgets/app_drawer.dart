@@ -8,134 +8,148 @@ import 'package:lastmile_transport/chatbot/chatbot_screen.dart';
 // import 'package:manymore/data/insert_riders.dart';
 // import 'package:manymore/data/locations_list.dart';
 
-
-
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
-
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      elevation: 12,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
       ),
       child: Column(
         children: [
+          // 🔥 PREMIUM HEADER
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
+            padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color.fromARGB(255, 54, 30, 233), Colors.purple],
+                colors: [
+                  Color(0xFF361EE9),
+                  Color(0xFF8E2DE2),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius:
+                  BorderRadius.only(bottomRight: Radius.circular(24)),
             ),
             child: Row(
               children: const [
                 CircleAvatar(
-                  radius: 28,
+                  radius: 26,
                   backgroundColor: Colors.white,
-                  child: Icon(Icons.child_friendly, size: 28),
+                  child: Icon(Icons.ev_station, size: 26),
                 ),
-                SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "404 team Not Selected",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Last Mile Transport",
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    Text(
-                      "Harshu is Building",
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
+                      SizedBox(height: 2),
+                      Text(
+                        "Smart EV Mobility",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
 
+          const SizedBox(height: 10),
 
-          const SizedBox(height: 12),
-
-
-          // _drawerItem(context, Icons.dashboard, "Payment Integration", () {
-          //   Navigator.pop(context);
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(
-          //       builder: (context) => const PaymentScreen(
-          //         amount: 0,
-          //         cycleId: "demo_cycle",
-          //         cycleNumber: "DEMO-001",
-          //       ),
-          //     ),
-          //   );
-          // }),
-
-
-          // _drawerItem(context, Icons.favorite, "Otp Verification", () {}),
-
-
-          _drawerItem(context, Icons.bedtime, "Chatbot  ", () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ChatApp()),
-            );
-          }),
-         _drawerItem(
-  context,
-  Icons.ev_station,
-  "Offline Booking",
-  () {
-    Navigator.pop(context);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            const EvHubOfflineChatbotScreen(),
-      ),
-    );
-  },
-),
-         
-           _drawerItem(context, Icons.auto_awesome, " group and Ride  ", () {
-             
+          // 🔹 MENU ITEMS
+          _drawerItem(
+            context,
+            Icons.smart_toy_outlined,
+            "Chatbot",
+            () {
               Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const RidesPage()),
-            );
-          }),
-            _drawerItem(context, Icons.pedal_bike, "Payed Lift  ", () {
-             
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatScreen()),
+              );
+            },
+          ),
+
+          _drawerItem(
+            context,
+            Icons.ev_station,
+            "Offline Booking",
+            () {
               Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
-            );
-          }),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const EvHubOfflineChatbotScreen(),
+                ),
+              );
+            },
+          ),
+
+          _drawerItem(
+            context,
+            Icons.groups_rounded,
+            "Group & Ride",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RidesPage()),
+              );
+            },
+          ),
+
+          _drawerItem(
+            context,
+            Icons.pedal_bike_rounded,
+            "Paid Lift",
+            () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const RoleSelectionScreen()),
+              );
+            },
+          ),
+
           const Spacer(),
-          const Divider(),
+          const Divider(height: 1),
 
+          // 🔴 LOGOUT
+          _drawerItem(
+            context,
+            Icons.logout_rounded,
+            "Logout",
+            () {
+              Navigator.pop(context);
+            },
+            isLogout: true,
+          ),
 
-          _drawerItem(context, Icons.logout, "Logout", () {
-            Navigator.pop(context);
-          }, isLogout: true),
-
-
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
         ],
       ),
     );
   }
 
-
+  // ⭐ PREMIUM TILE
   Widget _drawerItem(
     BuildContext context,
     IconData icon,
@@ -143,19 +157,37 @@ class AppDrawer extends StatelessWidget {
     VoidCallback onTap, {
     bool isLogout = false,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: isLogout ? Colors.red : Colors.black87),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w500,
-          color: isLogout ? Colors.red : Colors.black87,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 22,
+                  color: isLogout ? Colors.red : Colors.black87,
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                    color: isLogout ? Colors.red : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      onTap: onTap,
     );
   }
 }
-
-
-

@@ -110,34 +110,43 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        elevation: 1,
-        shadowColor: Colors.black12,
-        backgroundColor: Colors.white,
-        title: const Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Color(0xFF1E88E5),
-              child:
-                  Icon(Icons.directions_transit, color: Colors.white, size: 20),
-            ),
-            SizedBox(width: 12),
-            Text(
-              "Transit Assistant",
-              style: TextStyle(
-                  color: Colors.black87,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18),
-            ),
-          ],
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context);
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          elevation: 1,
+          shadowColor: Colors.black12,
+          backgroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black87),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFF1E88E5),
+                child:
+                    Icon(Icons.directions_transit, color: Colors.white, size: 20),
+              ),
+              SizedBox(width: 12),
+              Text(
+                "Transit Assistant",
+                style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18),
+              ),
+            ],
+          ),
         ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
+        body: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               itemCount: _messages.length + (_isLoading ? 1 : 0),
@@ -160,6 +169,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _buildMessageInput(),
         ],
       ),
+    ),
     );
   }
 

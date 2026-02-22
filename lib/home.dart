@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:lastmile_transport/chatbot/chatbot_screen.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import './widgets/app_drawer.dart';
 import 'EV_smartHub_screens/search_page.dart';
@@ -491,29 +492,32 @@ class _EVMapScreenState extends State<EVMapScreen> {
     return Scaffold(
       drawer: const AppDrawer(),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: Text(
-          widget.bookingData != null ? "Booking Map" : "EV Map",
-          style: const TextStyle(color: Colors.black),
-        ),
-        actions: [
-          if (widget.bookingData == null)
-            IconButton(
-              icon: const Icon(Icons.search, color: Colors.black),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const EVSmartHubSearchPage(),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0, // removes shadow in Material 3
+      automaticallyImplyLeading: true, // keeps drawer icon
+      title: const SizedBox(), // no title space
+      iconTheme: const IconThemeData(color: Colors.black),
+
+      actions: [
+        if (widget.bookingData == null)
+          IconButton(
+            icon: const Icon(Icons.search),
+            color: Colors.black,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EVSmartHubSearchPage(),
+                ),
+              );
+            },
+          ),
+      ],
+    ),
+
+    extendBodyBehindAppBar: true,
       body: SlidingUpPanel(
-        minHeight: widget.bookingData != null ? 220 : 180,
+        minHeight: widget.bookingData != null ? 100 : 100,
         maxHeight: widget.bookingData != null ? 420 : 420,
         borderRadius:
             const BorderRadius.vertical(top: Radius.circular(30)),
@@ -546,6 +550,16 @@ class _EVMapScreenState extends State<EVMapScreen> {
             }
           },
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ChatScreen()),
+          );
+        },
+        backgroundColor: const Color(0xFF1E88E5),
+        child: const Icon(Icons.chat),
+        tooltip: 'Transit Assistant',
       ),
     );
   }
@@ -683,46 +697,125 @@ class _EVMapScreenState extends State<EVMapScreen> {
 
   // ─── Exploration Panel (nearby hubs list) ────────────
   Widget _buildExplorationPanel() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          const Icon(Icons.drag_handle, color: Colors.grey),
-          const SizedBox(height: 10),
-          const Text(
-            "Nearby EV Hubs",
-            style:
-                TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8), // tighter
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // drag handle
+        Center(
+          child: Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[400],
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: ListView.builder(
-              itemCount: nearestHubs.length,
-              itemBuilder: (context, index) {
-                final hub = nearestHubs[index];
-                return ListTile(
-                  leading:
-                      const Icon(Icons.ev_station, color: Colors.green),
-                  title: GestureDetector(
+        ),
+
+        const SizedBox(height: 10), // reduced
+
+        // header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.ev_station,
+                size: 22, color: Color(0xFF1E88E5)),
+            SizedBox(width: 8),
+            Text(
+              "Nearby EV Hubs",
+              style: TextStyle(
+                fontSize: 24, // slightly smaller = tighter
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16), // 🔥 key reduction
+
+        // list
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.zero, // 🔥 removes top gap
+            itemCount: nearestHubs.length,
+            itemBuilder: (context, index) {
+              final hub = nearestHubs[index];
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3), // tighter
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
                     onTap: () => _routeToHub(hub),
-                    child: Text(
-                      hub["name"],
-                      style: const TextStyle(
-                        color: Colors.blue,
-                        decoration: TextDecoration.underline,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10), // tighter
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: Colors.grey[200]!, width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: Colors.green[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.ev_station,
+                                color: Colors.green, size: 18),
+                          ),
+
+                          const SizedBox(width: 10),
+
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  hub["name"],
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E88E5),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  "${(hub["distance"] as double).toStringAsFixed(2)} km away",
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          Icon(Icons.chevron_right,
+                              size: 18, color: Colors.grey[400]),
+                        ],
                       ),
                     ),
                   ),
-                  subtitle: Text(
-                      "${(hub["distance"] as double).toStringAsFixed(2)} km away"),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   // ─── Shared info card widget ──────────────────────────
   Widget _infoCard({
